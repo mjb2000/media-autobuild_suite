@@ -4,6 +4,8 @@ compile="false"
 buildFFmpeg="false"
 x264Bin="no"
 newFfmpeg="no"
+# Add QuickSync variable to determine if we are going to build with libmfx + h264_qsv support
+quicksync="n"
 while true; do
   case $1 in
 --cpuCount=* ) cpuCount="${1#*=}"; shift ;;
@@ -19,6 +21,8 @@ while true; do
 --nonfree=* ) nonfree="${1#*=}"; shift ;;
 --stripping* ) stripping="${1#*=}"; shift ;;
 --packing* ) packing="${1#*=}"; shift ;;
+# Add QuickSync variable to determine if we are going to build with libmfx + h264_qsv support
+--quicksync* ) quicksync="${1#*=}"; shift ;;
     -- ) shift; break ;;
     -* ) echo "Error, unknown option: '$1'."; exit 1 ;;
     * ) break ;;
@@ -190,7 +194,9 @@ if [ -f "$LOCALDESTDIR/lib/libfreetype.a" ]; then
 	else 
 		echo -ne "\033]0;compile freetype $bits\007"
 		rm -rf freetype-2.5.3
-		wget --tries=20 --retry-connrefused --waitretry=2 -c http://download.savannah.gnu.org/releases/freetype/freetype-2.5.3.tar.gz
+		# I had to change this URL because the previous was was doing a 302 redirect to
+		# a server which was not responding.
+		wget --tries=20 --retry-connrefused --waitretry=2 -c http://ftp.twaren.net/Unix/NonGNU/freetype/freetype-2.5.3.tar.gz
 		tar xf freetype-2.5.3.tar.gz
 		rm freetype-2.5.3.tar.gz
 		cd freetype-2.5.3
@@ -863,7 +869,7 @@ if [[ $compile == "true" ]]; then
 		make clean
 	fi
 	
-	./configure --build=$targetBuild --host=$targetHost --prefix=$LOCALDESTDIR --bindir=$LOCALDESTDIR/bin-audio --enable-shared=no CPPFLAGS='-DPCRE_STATIC' LIBS='-lpcre -lshlwapi -lz -lgnurx'
+	./configure --build=$targetBuild --host=$targetHost --prefix=$LOCALDESTDIR --bindir=$LOCALDESTDIR/bin-audio --enable-shared=no CPPFLAGS='-DPCRE_STATIC' LIBS='-lpcre -lshlwapi -lz'
 	
 	make -j $cpuCount
 	make install
@@ -892,6 +898,35 @@ echo "compile video tools $bits"
 echo
 echo "-------------------------------------------------------------------------------"
 
+if [[ $quicksync == "y" ]]; then
+
+	cd $LOCALBUILDDIR
+
+	do_git "https://github.com/mjb2000/mfx_dispatch.git" mfx_dispatch-git
+
+	if [[ $compile == "true" ]]; then
+		if [[ ! -f "configure" ]]; then
+			autoreconf -fiv
+		else
+			make uninstall
+			make clean
+		fi
+		
+		./configure --build=$targetBuild --host=$targetHost --prefix=$LOCALDESTDIR --bindir=$LOCALDESTDIR/bin-global --disable-shared
+		
+		make -j $cpuCount
+		make install
+		
+		do_checkIfExist mfx_dispatch-git libmfx.a
+		compile="false"
+	else
+		echo -------------------------------------------------
+		echo "libmfx-git is already up to date"
+		echo -------------------------------------------------
+	fi
+
+fi
+
 do_git "http://git.chromium.org/webm/libvpx.git" libvpx-git noDepth
 
 if [[ $compile == "true" ]]; then
@@ -903,10 +938,18 @@ if [[ $compile == "true" ]]; then
 	fi
 	
 	if [[ $bits = "64bit" ]]; then
-		LDFLAGS="$LDFLAGS -static-libgcc -static" ./configure --prefix=$LOCALDESTDIR --target=x86_64-win64-gcc --disable-shared --enable-static --disable-unit-tests --disable-docs --enable-postproc --enable-vp9-postproc --enable-runtime-cpu-detect
+		# Checkout v1.3.0 - latest git wasn't compiling when I tried to use this script
+		# Because this is an old version, each time we run the script it will 
+		# grab the latest version and revert to 1.3.0 - I'm not sure how to prevent this
+		git checkout v1.3.0
+		LDFLAGS="$LDFLAGS -static-libgcc -static" ./configure --prefix=$LOCALDESTDIR --target=x86_64-win64-gcc --disable-shared --enable-static --disable-unit-tests --disable-examples --disable-docs --enable-postproc --enable-vp9-postproc --enable-runtime-cpu-detect
 		sed -i 's/HAVE_GNU_STRIP=yes/HAVE_GNU_STRIP=no/g' libs-x86_64-win64-gcc.mk
 	else
-		LDFLAGS="$LDFLAGS -static-libgcc -static" ./configure --prefix=$LOCALDESTDIR --target=x86-win32-gcc --disable-shared --enable-static --disable-unit-tests --disable-docs --enable-postproc --enable-vp9-postproc --enable-runtime-cpu-detect
+		# Checkout v1.3.0 - latest git wasn't compiling when I tried to use this script
+		# Because this is an old version, each time we run the script it will 
+		# grab the latest version and revert to 1.3.0 - I'm not sure how to prevent this
+		git checkout v1.3.0
+		LDFLAGS="$LDFLAGS -static-libgcc -static" ./configure --prefix=$LOCALDESTDIR --target=x86-win32-gcc --disable-shared --enable-static --disable-unit-tests --disable-examples --disable-docs --enable-postproc --enable-vp9-postproc --enable-runtime-cpu-detect
 		sed -i 's/HAVE_GNU_STRIP=yes/HAVE_GNU_STRIP=no/g' libs-x86-win32-gcc.mk
 	fi 
 
@@ -1373,7 +1416,7 @@ do_git "git://git.videolan.org/x264.git" x264-git noDepth
 if [[ $compile == "true" ]]; then
 	cd $LOCALBUILDDIR
 
-	do_git "https://github.com/FFmpeg/FFmpeg.git" ffmpeg-git
+	do_git "https://github.com/mjb2000/FFmpeg.git" ffmpeg-git
 
 	echo "-------------------------------------------------------------------------------"
 	echo "compile ffmpeg $bits libs"
@@ -1415,8 +1458,14 @@ if [[ $compile == "true" ]]; then
 	else
 		arch='x86_64'
 	fi
+	
+	if [[ $quicksync = "y" ]]; then
+		libmfx='--enable-libmfx'
+	else
+		libmfx=''
+	fi 
 
-	./configure --arch=$arch --target-os=mingw32 --prefix=$LOCALDESTDIR --disable-debug --disable-shared --disable-doc --enable-runtime-cpudetect --disable-programs
+	./configure $libmfx --arch=$arch --target-os=mingw32 --prefix=$LOCALDESTDIR --disable-debug --disable-shared --disable-doc --enable-runtime-cpudetect --disable-programs
 
 	make -j $cpuCount
 	make install
@@ -1510,7 +1559,7 @@ if [[ $ffmpeg = "y" ]] || [[ $ffmpeg = "s" ]]; then
 	echo "compile ffmpeg $bits"
 	echo "-------------------------------------------------------------------------------"
 
-	do_git "https://github.com/FFmpeg/FFmpeg.git" ffmpeg-git
+	do_git "https://github.com/mjb2000/FFmpeg.git" ffmpeg-git
 
 	if [[ $compile == "true" ]] || [[ $buildFFmpeg == "true" ]]; then
 		if [ -f "$LOCALDESTDIR/lib/libavcodec.a" ]; then 
@@ -1549,18 +1598,24 @@ if [[ $ffmpeg = "y" ]] || [[ $ffmpeg = "s" ]]; then
 		else
 			arch='x86_64'
 		fi
+		
+		if [[ $quicksync = "y" ]]; then
+		libmfx='--enable-libmfx'
+		else
+		libmfx=''
+	fi 
 			
 		if [[ $ffmpeg = "s" ]]; then
 			if [ -f "$LOCALDESTDIR/bin-video/ffmpegSHARED/bin/ffmpeg.exe" ]; then 
 				rm -rf $LOCALDESTDIR/bin-video/ffmpegSHARED
 				make distclean
 			fi
-			CPPFLAGS='-DFRIBIDI_ENTRY="" ' LDFLAGS="$LDFLAGS -static-libgcc" ./configure --arch=$arch --target-os=mingw32 --prefix=$LOCALDESTDIR/bin-video/ffmpegSHARED --disable-debug --disable-static --disable-doc --disable-w32threads --enable-shared --enable-gpl --enable-version3 --enable-runtime-cpudetect --enable-avfilter --enable-bzlib --enable-zlib --enable-librtmp --enable-gnutls --enable-avisynth --enable-frei0r --enable-filter=frei0r --enable-libbluray --enable-libcaca --enable-libopenjpeg --enable-fontconfig --enable-libfreetype --enable-libass --enable-libgsm --enable-libilbc --enable-libmodplug --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libsoxr --enable-libtwolame --enable-libspeex --enable-libtheora --enable-libvorbis --enable-libvo-aacenc --enable-libopus --enable-libvidstab --enable-libvpx --enable-libwavpack --enable-libxavs --enable-libx264 --enable-libx265 --enable-libxvid --enable-libzvbi $extras --extra-cflags='-DPTW32_STATIC_LIB -DLIBTWOLAME_STATIC -DCACA_STATIC -DMODPLUG_STATIC' --extra-libs='-lxml2 -llzma -lstdc++ -lpng -lm -lpthread -lwsock32 -lhogweed -lnettle -lgmp -ltasn1 -lws2_32 -lwinmm -lgdi32 -lcrypt32 -lintl -lz -liconv -lole32 -loleaut32' --extra-ldflags='-mconsole -Wl,--allow-multiple-definition'
+			CPPFLAGS='-DFRIBIDI_ENTRY="" ' LDFLAGS="$LDFLAGS -static-libgcc" ./configure $libmfx --arch=$arch --target-os=mingw32 --prefix=$LOCALDESTDIR/bin-video/ffmpegSHARED --disable-debug --disable-static --disable-doc --disable-w32threads --enable-shared --enable-gpl --enable-version3 --enable-runtime-cpudetect --enable-avfilter --enable-bzlib --enable-zlib --enable-librtmp --enable-gnutls --enable-avisynth --enable-frei0r --enable-filter=frei0r --enable-libbluray --enable-libcaca --enable-libopenjpeg --enable-fontconfig --enable-libfreetype --enable-libass --enable-libgsm --enable-libilbc --enable-libmodplug --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libsoxr --enable-libtwolame --enable-libspeex --enable-libtheora --enable-libvorbis --enable-libvo-aacenc --enable-libopus --enable-libvidstab --enable-libvpx --enable-libwavpack --enable-libxavs --enable-libx264 --enable-libx265 --enable-libxvid --enable-libzvbi $extras --extra-cflags='-DPTW32_STATIC_LIB -DLIBTWOLAME_STATIC -DCACA_STATIC -DMODPLUG_STATIC' --extra-libs='-lxml2 -llzma -lstdc++ -lpng -lm -lpthread -lwsock32 -lhogweed -lnettle -lgmp -ltasn1 -lws2_32 -lwinmm -lgdi32 -lcrypt32 -lintl -lz -liconv -lole32 -loleaut32' --extra-ldflags='-mconsole -Wl,--allow-multiple-definition'
 		else
 			if [ -f "$LOCALDESTDIR/bin-video/ffmpegSHARED/bin/ffmpeg.exe" ]; then
 				make distclean
 			fi
-			CPPFLAGS='-DFRIBIDI_ENTRY="" ' ./configure --arch=$arch --target-os=mingw32 --prefix=$LOCALDESTDIR --bindir=$LOCALDESTDIR/bin-video --disable-debug --disable-shared --disable-doc --disable-w32threads --enable-gpl --enable-version3 --enable-runtime-cpudetect --enable-avfilter --enable-bzlib --enable-zlib --enable-decklink --enable-librtmp --enable-gnutls --enable-avisynth --enable-frei0r --enable-filter=frei0r --enable-libbluray --enable-libcaca --enable-libopenjpeg --enable-fontconfig --enable-libfreetype --enable-libass --enable-libgsm --enable-libilbc --enable-libmodplug --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libsoxr --enable-libtwolame --enable-libspeex --enable-libtheora --enable-libutvideo --enable-libvorbis --enable-libvo-aacenc --enable-libopus --enable-libvidstab --enable-libvpx --enable-libwavpack --enable-libxavs --enable-libx264 --enable-libx265 --enable-libxvid --enable-libzvbi $extras --extra-cflags='-DPTW32_STATIC_LIB -DLIBTWOLAME_STATIC -DCACA_STATIC -DMODPLUG_STATIC' --extra-libs='-lxml2 -llzma -lstdc++ -lpng -lm -lpthread -lwsock32 -lhogweed -lnettle -lgmp -ltasn1 -lws2_32 -lwinmm -lgdi32 -lcrypt32 -lintl -lz -liconv -lole32 -loleaut32' --extra-ldflags='-mconsole -Wl,--allow-multiple-definition'
+			CPPFLAGS='-DFRIBIDI_ENTRY="" ' ./configure $libmfx --arch=$arch --target-os=mingw32 --prefix=$LOCALDESTDIR --bindir=$LOCALDESTDIR/bin-video --disable-debug --disable-shared --disable-doc --disable-w32threads --enable-gpl --enable-version3 --enable-runtime-cpudetect --enable-avfilter --enable-bzlib --enable-zlib --enable-decklink --enable-librtmp --enable-gnutls --enable-avisynth --enable-frei0r --enable-filter=frei0r --enable-libbluray --enable-libcaca --enable-libopenjpeg --enable-fontconfig --enable-libfreetype --enable-libass --enable-libgsm --enable-libilbc --enable-libmodplug --enable-libmp3lame --enable-libopencore-amrnb --enable-libopencore-amrwb --enable-libvo-amrwbenc --enable-libschroedinger --enable-libsoxr --enable-libtwolame --enable-libspeex --enable-libtheora --enable-libutvideo --enable-libvorbis --enable-libvo-aacenc --enable-libopus --enable-libvidstab --enable-libvpx --enable-libwavpack --enable-libxavs --enable-libx264 --enable-libx265 --enable-libxvid --enable-libzvbi $extras --extra-cflags='-DPTW32_STATIC_LIB -DLIBTWOLAME_STATIC -DCACA_STATIC -DMODPLUG_STATIC' --extra-libs='-lxml2 -llzma -lstdc++ -lpng -lm -lpthread -lwsock32 -lhogweed -lnettle -lgmp -ltasn1 -lws2_32 -lwinmm -lgdi32 -lcrypt32 -lintl -lz -liconv -lole32 -loleaut32' --extra-ldflags='-mconsole -Wl,--allow-multiple-definition'
 			
 			newFfmpeg="yes"
 		fi
@@ -1648,7 +1703,7 @@ if [[ $mplayer = "y" ]]; then
 		fi
 		
 		if ! test -e ffmpeg ; then
-			if ! git clone --depth 1 git://source.ffmpeg.org/ffmpeg.git ffmpeg ; then
+			if ! git clone --depth 1 git://github.com/mjb2000/FFmpeg.git ffmpeg ; then
 				rm -rf ffmpeg
 				echo "Failed to get a FFmpeg checkout"
 				echo "Please try again or put FFmpeg source code copy into ffmpeg/ manually."

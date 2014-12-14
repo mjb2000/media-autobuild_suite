@@ -62,6 +62,7 @@ if exist %ini% GOTO checkINI
 	set deleteSourceINI=0
 	set stripINI=0
 	set packINI=0
+	set QuickSyncINI=0
 
 	GOTO systemVars
 
@@ -91,6 +92,8 @@ findstr /i "deleteSource" %ini% > nul
 findstr /i "strip" %ini% > nul
 	if ERRORLEVEL 1 del %ini% && GOTO selectmsys2Arch
 findstr /i "pack" %ini% > nul
+	if ERRORLEVEL 1 del %ini% && GOTO selectmsys2Arch
+findstr /i "quicksync" %ini% > nul
 	if ERRORLEVEL 1 del %ini% && GOTO selectmsys2Arch	
 	
 :readINI
@@ -107,6 +110,7 @@ for /F "tokens=2 delims==" %%h in ('findstr /i "cores" %ini%') do set coresINI=%
 for /F "tokens=2 delims==" %%i in ('findstr /i "deleteSource" %ini%') do set deleteSourceINI=%%i
 for /F "tokens=2 delims==" %%k in ('findstr /i "strip" %ini%') do set stripINI=%%k
 for /F "tokens=2 delims==" %%g in ('findstr /i "pack" %ini%') do set packINI=%%g
+for /F "tokens=2 delims==" %%n in ('findstr /i "quicksync" %ini%') do set QuickSyncINI=%%n
 
 :systemVars
 set msys2Arch=%msys2ArchINI%
@@ -119,6 +123,8 @@ if %msys2Arch%==2 (
 
 :selectSystem
 set "writeArch=no"
+echo packINI = %packINI%
+echo qsINI = %QuickSyncINI%
 if %archINI%==0 (
 	echo -------------------------------------------------------------------------------
 	echo -------------------------------------------------------------------------------
@@ -235,6 +241,35 @@ if %buildffmpegUp%==2 (
 	)
 if %buildffmpegUp% GTR 2 GOTO ffmpegUp
 if %writeFFU%==yes echo.ffmpegUpdate=^%buildffmpegUp%>>%ini%
+
+:QuickSync
+set "writeQuickSync=no"
+if %QuickSyncINI%==0 (
+	echo -------------------------------------------------------------------------------
+	echo -------------------------------------------------------------------------------
+	echo.
+	echo. Include Intel QuickSync support
+	echo. Builds libmfx and adds h264_qsv support to ffmpeg
+	echo. 1 = yes
+	echo. 2 = no
+	echo.
+	echo -------------------------------------------------------------------------------
+	echo -------------------------------------------------------------------------------
+	set /P QuickSyncF="Enable QuickSync:"
+	set "writeQuickSync=yes"
+	) else (
+		set QuickSyncF=%QuickSyncINI%
+	)
+	
+if %QuickSyncF%==1 (
+	set "QuickSync=y"
+	)
+if %QuickSyncF%==2 (
+	set "QuickSync=n"
+	)
+if %QuickSyncF% GTR 2 GOTO QuickSync
+if %writeQuickSync%==yes echo.quicksync=^%QuickSyncF%>>%ini%
+
 
 :mp4boxStatic
 set "writeMP4Box=no"
@@ -448,6 +483,7 @@ if %packF%==2 (
 	)
 if %packF% GTR 2 GOTO packEXE
 if %writePack%==yes echo.pack=^%packF%>>%ini%
+
 
 ::------------------------------------------------------------------
 ::download and install basic msys2 system:
@@ -904,7 +940,7 @@ if %build32%==yes (
 		echo.- write profile for 32 bit compiling
 		echo.
 		echo -------------------------------------------------------------------------------
-		(
+			(
 			echo.#
 			echo.# /local32/etc/profile.local
 			echo.#
@@ -959,7 +995,7 @@ if %build64%==yes (
 		echo.- write profile for 64 bit compiling
 		echo.
 		echo -------------------------------------------------------------------------------
-		(
+			(
 			echo.#
 			echo.# /local64/etc/profile.local
 			echo.#
@@ -1046,6 +1082,6 @@ IF ERRORLEVEL == 1 (
 	pause
   )
 
-start %instdir%\%msys2%\usr\bin\mintty.exe -i /msys2.ico /usr/bin/bash --login %instdir%\media-suite_compile.sh --cpuCount=%cpuCount% --build32=%build32% --build64=%build64% --deleteSource=%deleteSource% --mp4box=%mp4box% --ffmpeg=%ffmpeg% --ffmpegUpdate=%ffmpegUpdate% --mplayer=%mplayer% --mpv=%mpv% --mkv=%mkv% --nonfree=%binary%  --stripping=%stripFile% --packing=%packFile%
+start %instdir%\%msys2%\usr\bin\mintty.exe -i /msys2.ico /usr/bin/bash --login %instdir%\media-suite_compile.sh --cpuCount=%cpuCount% --build32=%build32% --build64=%build64% --deleteSource=%deleteSource% --mp4box=%mp4box% --ffmpeg=%ffmpeg% --ffmpegUpdate=%ffmpegUpdate% --mplayer=%mplayer% --mpv=%mpv% --mkv=%mkv% --nonfree=%binary%  --stripping=%stripFile% --packing=%packFile% --quicksync=%QuickSync%
 
 exit
