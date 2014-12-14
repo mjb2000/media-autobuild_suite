@@ -122,7 +122,7 @@ I have only tested building 32bit static ffmpeg using a 64 architecture
 Usage
 --------
 
-Please see the Wiki
+Please see the [usage page within the Wiki](https://github.com/mjb2000/media-autobuild_suite/wiki/Usage)
 
 References
 --------
