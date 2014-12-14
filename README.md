@@ -14,13 +14,15 @@ modified: 2014-12-08
 tweaked: 2014-12-14
 
 ---
-
+ 
 media-autobuild_suite
 =========
 
 This tool is based on the original script from [jb-alvarado](https://github.com/jb-alvarado/media-autobuild_suite).
 
 I have tweaked the script to fix a couple of issues and use a couple of private forked versions of [mfx_dispatcher](https://github.com/mjb2000/mfx_dispatch) and [ffmpeg](https://github.com/mjb2000/FFmpeg) to build ffmpeg with Intel QuickSync support
+
+Since I have updated this script to point it to my own fork of FFMPEG, it is currently no longer tracking the main FFMPEG development. I have only added a few files to the original ffmpeg source, but I don't know enough about how github works to allow me to stick with the original ffmpeg source but include the couple of modifications required for QuickSync support.
 
 jb-alvarado's tool was inspired by the very nice, linux cross compile, tool from Roger Pack(rdp):
 https://github.com/rdp/ffmpeg-windows-build-helpers
