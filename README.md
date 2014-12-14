@@ -42,7 +42,7 @@ Download
 
 See the wiki for more information on how to use the script
 
-#### [Click here to download the latest 32-bit binary release with Intel Quicksync support](#)
+#### [Click here to download the latest 32-bit binary release with Intel Quicksync support](https://github.com/mjb2000/media-autobuild_suite/releases/download/1.0/ffmpeg.exe)
 
 Included Tools And Libraries
 --------
