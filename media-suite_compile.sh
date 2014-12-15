@@ -938,17 +938,9 @@ if [[ $compile == "true" ]]; then
 	fi
 	
 	if [[ $bits = "64bit" ]]; then
-		# Checkout v1.3.0 - latest git wasn't compiling when I tried to use this script
-		# Because this is an old version, each time we run the script it will 
-		# grab the latest version and revert to 1.3.0 - I'm not sure how to prevent this
-		git checkout v1.3.0
 		LDFLAGS="$LDFLAGS -static-libgcc -static" ./configure --prefix=$LOCALDESTDIR --target=x86_64-win64-gcc --disable-shared --enable-static --disable-unit-tests --disable-examples --disable-docs --enable-postproc --enable-vp9-postproc --enable-runtime-cpu-detect
 		sed -i 's/HAVE_GNU_STRIP=yes/HAVE_GNU_STRIP=no/g' libs-x86_64-win64-gcc.mk
 	else
-		# Checkout v1.3.0 - latest git wasn't compiling when I tried to use this script
-		# Because this is an old version, each time we run the script it will 
-		# grab the latest version and revert to 1.3.0 - I'm not sure how to prevent this
-		git checkout v1.3.0
 		LDFLAGS="$LDFLAGS -static-libgcc -static" ./configure --prefix=$LOCALDESTDIR --target=x86-win32-gcc --disable-shared --enable-static --disable-unit-tests --disable-examples --disable-docs --enable-postproc --enable-vp9-postproc --enable-runtime-cpu-detect
 		sed -i 's/HAVE_GNU_STRIP=yes/HAVE_GNU_STRIP=no/g' libs-x86-win32-gcc.mk
 	fi 
