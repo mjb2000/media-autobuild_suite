@@ -11,7 +11,7 @@ created:  2013-09-24
 
 modified: 2014-12-08
 
-tweaked: 2014-12-14
+tweaked: 2014-12-15
 
 ---
  
@@ -117,9 +117,7 @@ Included Tools And Libraries
 Current issues
 --------
 
-The latest git version of libvpx does not compile correctly, so I have force a checkout of version 1.3.0 - however since this is not the latest version, each time you run the script, it will try to download the latest git version before reverting to v1.3.0
-
-I have only tested building 32bit static ffmpeg using a 64 architecture
+I have only tested building 32bit static ffmpeg binary using a 64bit architecture
 
 Usage
 --------
